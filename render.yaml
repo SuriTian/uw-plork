@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: uw-plork-backend
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DB_DRIVER
+        value: sqlite

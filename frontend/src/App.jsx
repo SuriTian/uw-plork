@@ -840,7 +840,7 @@ function MainApp({ userId: propUserId, initialProfile, onLogout }) {
   const [showManageApplicants, setShowManageApplicants] = useState(false);
   const [showTopMatches, setShowTopMatches] = useState(false);
   const [profile, setProfile] = useState(initialProfile || { name: "", email: "", discipline: "", year: "", skills: [], interests: [], built: "", terms: [], commitment: "", github: "" });
-  const [userId, setUserId] = useState(propUserId);
+  const [userId] = useState(propUserId);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -946,7 +946,7 @@ function MainApp({ userId: propUserId, initialProfile, onLogout }) {
         });
       }
     }
-  }, [profile?.skills, profile?.interests, userId, mode, selectedId]);
+  }, [profile, userId, mode, selectedId]);
 
   if (showProfile) return <ProfilePage profile={profile} onSave={p => { setProfile(p); }} onBack={() => setShowProfile(false)} userId={userId} />;
 

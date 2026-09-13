@@ -83,7 +83,6 @@ export const api = {
           .catch(() => ({ error: "Registration failed" }));
         throw new Error(errorData.error || "Registration failed");
       }
-      const result = await response.json();
       // Get the created user to return ID
       const usersRes = await fetch(`${API_BASE}/users`);
       if (!usersRes.ok) throw new Error("Failed to fetch created user");

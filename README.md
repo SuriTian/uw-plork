@@ -80,6 +80,12 @@ This gives the poster a stable, merit-based ordering — the applicant at the to
 
 ---
 
+## Deployment
+
+The hosted demo runs on free tiers, which means the production backend uses an **in-memory SQLite database instead of persistent MySQL** — a real database, fully functional, it just resets whenever the free container restarts or goes idle. Local dev still uses real MySQL (see `.env.example`). Set `DB_DRIVER=sqlite` to run the ephemeral mode yourself.
+
+---
+
 ## API Routes
 
 | Method | Route | Description |
