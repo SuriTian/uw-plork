@@ -114,7 +114,7 @@ function SectionDivider() {
   return <div style={{ height: 1, background: C.rule, margin: "28px 0" }} />;
 }
 
-function Landing({ onLogin, onSignup }) {
+function Landing({ onLogin, onSignup, onDemo }) {
   return (
     <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'IBM Plex Mono',monospace", color: C.ink }}>
       <style>{BASE_CSS}</style>
@@ -139,9 +139,10 @@ function Landing({ onLogin, onSignup }) {
             <p style={{ fontSize: 14, color: C.body, lineHeight: 1.8, maxWidth: 420, marginBottom: 40 }}>
               The co-op cycle kills side projects and sports teams alike. Plork matches you by skill, schedule, and the terms you're actually on campus.
             </p>
-            <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <button onClick={onSignup} style={{ fontSize: 12, letterSpacing: "0.1em", fontWeight: 700, padding: "13px 32px", border: "none", background: C.lime, color: C.limeInk, cursor: "pointer" }}>GET STARTED →</button>
               <button onClick={onLogin} style={{ fontSize: 12, letterSpacing: "0.1em", padding: "13px 32px", border: `1px solid ${C.rule}`, background: "transparent", color: C.body, cursor: "pointer" }}>LOG IN</button>
+              <button onClick={onDemo} style={{ fontSize: 12, letterSpacing: "0.1em", padding: "13px 32px", border: `1px solid ${C.rule}`, background: "transparent", color: C.muted, cursor: "pointer" }}>VIEW DEMO (READ ONLY)</button>
             </div>
           </div>
           <div style={{ display: "flex", paddingTop: 32, borderTop: `1px solid ${C.rule}`, marginTop: 56 }}>
@@ -828,7 +829,7 @@ function TopMatchesPage({ postId, postName, mode, onBack, userId }) {
   );
 }
 
-function MainApp({ userId: propUserId, initialProfile, onLogout }) {
+function MainApp({ userId: propUserId, initialProfile, onLogout, readOnly = false }) {
   const [mode, setMode] = useState("WORK");
   const [projects, setProjects] = useState([]);
   const [activities, setActivities] = useState([]);
@@ -854,7 +855,7 @@ function MainApp({ userId: propUserId, initialProfile, onLogout }) {
   }, [userId]);
 
   useEffect(() => {
-    if (userId) {
+    if (userId || readOnly) {
       setLoading(true);
       api.getProjects(mode, userId).then(data => {
         if (mode === "WORK") {
@@ -870,7 +871,7 @@ function MainApp({ userId: propUserId, initialProfile, onLogout }) {
         setLoading(false);
       });
     }
-  }, [mode, userId]);
+  }, [mode, userId, readOnly]);
 
   const items = mode === "WORK" ? projects : activities;
   // Sort by compatibility percentage (descending), with "yours" items first
@@ -967,6 +968,7 @@ function MainApp({ userId: propUserId, initialProfile, onLogout }) {
         <div style={{ padding: "0 24px", display: "flex", alignItems: "center", borderRight: `1px solid ${C.rule}`, gap: 10 }}>
           <D size={24}>PLORK</D>
           <div style={{ width: 5, height: 5, background: C.lime, animation: "blink 1.4s infinite" }} />
+          {readOnly && <M style={{ fontSize: 9, color: C.muted, letterSpacing: "0.1em", border: `1px solid ${C.rule}`, padding: "2px 7px", marginLeft: 4 }}>DEMO — READ ONLY</M>}
         </div>
         {["WORK", "PLAY"].map(m => (
           <button key={m} onClick={() => switchMode(m)} style={{ padding: "0 22px", display: "flex", alignItems: "center", cursor: "pointer", fontSize: 11, letterSpacing: "0.1em", color: mode === m ? C.ink : C.muted, background: "transparent", border: "none", borderBottom: mode === m ? `2px solid ${C.lime}` : "2px solid transparent", transition: "color 0.12s", userSelect: "none", paddingLeft: 22, paddingRight: 22 }}>{m} MODE</button>
@@ -978,12 +980,12 @@ function MainApp({ userId: propUserId, initialProfile, onLogout }) {
               <div style={{ fontSize: 12, color: C.body }}>{v}</div>
             </div>
           ))}
-          <button onClick={() => setShowProfile(true)} style={{ padding: "0 18px", display: "flex", alignItems: "center", gap: 10, background: "transparent", border: "none", cursor: "pointer", borderLeft: `1px solid ${C.rule}` }}>
+          {!readOnly && <button onClick={() => setShowProfile(true)} style={{ padding: "0 18px", display: "flex", alignItems: "center", gap: 10, background: "transparent", border: "none", cursor: "pointer", borderLeft: `1px solid ${C.rule}` }}>
             <div style={{ width: 32, height: 32, border: `1px solid ${C.rule}`, background: C.surface, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>🧑‍💻</div>
             <M style={{ fontSize: 11, color: C.body }}>{profile.name ? profile.name.split(" ")[0] : "Profile"}</M>
-          </button>
+          </button>}
           <button onClick={onLogout} style={{ padding: "0 18px", display: "flex", alignItems: "center", background: "transparent", border: "none", cursor: "pointer", borderLeft: `1px solid ${C.rule}` }}>
-            <M style={{ fontSize: 11, color: C.muted }}>LOG OUT</M>
+            <M style={{ fontSize: 11, color: C.muted }}>{readOnly ? "EXIT DEMO" : "LOG OUT"}</M>
           </button>
         </div>
       </div>
@@ -1001,9 +1003,9 @@ function MainApp({ userId: propUserId, initialProfile, onLogout }) {
                 <button key={f} onClick={() => setFilter(f)} style={{ flex: 1, padding: "6px", fontSize: 10, letterSpacing: "0.08em", border: `1px solid ${C.rule}`, background: filter === f ? C.ink : "transparent", color: filter === f ? C.bg : C.muted, cursor: "pointer", transition: "all 0.1s" }}>{f}</button>
               ))}
             </div>
-            <button onClick={() => setShowPost(true)} style={{ width: "100%", padding: "9px", fontSize: 11, letterSpacing: "0.1em", fontWeight: 700, background: C.lime, color: C.limeInk, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+            {!readOnly && <button onClick={() => setShowPost(true)} style={{ width: "100%", padding: "9px", fontSize: 11, letterSpacing: "0.1em", fontWeight: 700, background: C.lime, color: C.limeInk, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
               + POST {mode === "WORK" ? "PROJECT" : "ACTIVITY"}
-            </button>
+            </button>}
           </div>
           <div style={{ flex: 1, overflowY: "auto" }}>
             {loading && <div style={{ padding: "40px 20px", textAlign: "center" }}><M style={{ fontSize: 12, color: C.muted }}>Loading...</M></div>}
@@ -1036,12 +1038,12 @@ function MainApp({ userId: propUserId, initialProfile, onLogout }) {
               );
             })}
           </div>
-          <div style={{ padding: "12px 16px", borderTop: `1px solid ${C.rule}`, background: C.surface }}>
+          {!readOnly && <div style={{ padding: "12px 16px", borderTop: `1px solid ${C.rule}`, background: C.surface }}>
             <M style={{ fontSize: 9, color: C.muted, letterSpacing: "0.1em", display: "block", marginBottom: 8 }}>YOUR SKILLS</M>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
               {profile.skills.slice(0, 5).map(s => <M key={s} style={{ fontSize: 10, background: C.limeLight, color: C.limeDark, border: `1px solid ${C.lime}66`, padding: "2px 8px" }}>{s}</M>)}
             </div>
-          </div>
+          </div>}
         </div>
 
         {sel && (
@@ -1089,20 +1091,26 @@ function MainApp({ userId: propUserId, initialProfile, onLogout }) {
                           {role.filled && <M style={{ fontSize: 11, color: C.lime, display: "block", marginBottom: 6 }}>→ {role.member}</M>}
                           <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>{role.skills?.map(s => <M key={s} style={{ fontSize: 9, color: C.muted, border: `1px solid ${C.rule}`, padding: "2px 6px" }}>{s}</M>)}</div>
                         </div>
-                        {!role.filled && !sel.yours && <M onClick={() => handleApply(sel.id)} style={{ fontSize: 10, color: C.lime, border: `1px solid ${C.lime}`, padding: "4px 12px", cursor: "pointer", letterSpacing: "0.06em", flexShrink: 0, marginTop: 2 }}>APPLY</M>}
+                        {!role.filled && !sel.yours && !readOnly && <M onClick={() => handleApply(sel.id)} style={{ fontSize: 10, color: C.lime, border: `1px solid ${C.lime}`, padding: "4px 12px", cursor: "pointer", letterSpacing: "0.06em", flexShrink: 0, marginTop: 2 }}>APPLY</M>}
                       </div>
                     ))}
                     {mode === "PLAY" && [...Array(sel.spots || 0)].map((_, i) => (
                       <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "13px 0", borderBottom: `1px solid ${C.rule}` }}>
                         <div style={{ width: 8, height: 8, border: `1px solid ${C.rule}` }} />
                         <span style={{ fontSize: 13, color: C.body, flex: 1 }}>Open spot {i + 1}</span>
-                        {!sel.yours && <M onClick={() => handleApply(sel.id)} style={{ fontSize: 10, color: C.lime, border: `1px solid ${C.lime}`, padding: "4px 12px", cursor: "pointer" }}>JOIN</M>}
+                        {!sel.yours && !readOnly && <M onClick={() => handleApply(sel.id)} style={{ fontSize: 10, color: C.lime, border: `1px solid ${C.lime}`, padding: "4px 12px", cursor: "pointer" }}>JOIN</M>}
                       </div>
                     ))}
                     {mode === "PLAY" && sel.tags && <div style={{ display: "flex", gap: 6, marginTop: 16, flexWrap: "wrap" }}>{sel.tags.map(t => <M key={t} style={{ fontSize: 10, color: C.muted, border: `1px solid ${C.rule}`, padding: "3px 9px" }}>{t}</M>)}</div>}
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-                    {!sel.yours && (
+                    {!sel.yours && readOnly && (
+                      <div style={{ border: `1px solid ${C.rule}`, padding: "22px", background: C.surface }}>
+                        <M style={{ fontSize: 10, color: C.muted, letterSpacing: "0.12em", display: "block", marginBottom: 10 }}>DEMO — READ ONLY</M>
+                        <p style={{ fontSize: 12, color: C.body, lineHeight: 1.5 }}>Sign up for a real account to apply or post.</p>
+                      </div>
+                    )}
+                    {!sel.yours && !readOnly && (
                       <div style={{ border: `1px solid ${C.lime}`, padding: "22px", background: C.limeLight }}>
                         <M style={{ fontSize: 10, color: C.limeDark, letterSpacing: "0.12em", display: "block", marginBottom: 10 }}>{mode === "WORK" ? "YOU FIT THIS ROLE" : "YOU CAN JOIN"}</M>
                         <p style={{ fontSize: 14, color: C.ink, marginBottom: 6 }}>{mode === "WORK" ? `${openRoles.length} open role${openRoles.length !== 1 ? "s" : ""} match your skills` : `${sel.spots} spot${sel.spots !== 1 ? "s" : ""} open this term`}</p>
@@ -1218,5 +1226,6 @@ export default function App() {
   if (screen === "login") return <Login onBack={() => setScreen("landing")} onSuccess={handleAuthSuccess} />;
   if (screen === "onboarding") return <Onboarding onComplete={handleAuthSuccess} />;
   if (screen === "app") return <MainApp userId={userId} initialProfile={userProfile} onLogout={handleLogout} />;
-  return <Landing onLogin={() => setScreen("login")} onSignup={() => setScreen("onboarding")} />;
+  if (screen === "demo") return <MainApp userId={null} initialProfile={null} onLogout={() => setScreen("landing")} readOnly />;
+  return <Landing onLogin={() => setScreen("login")} onSignup={() => setScreen("onboarding")} onDemo={() => setScreen("demo")} />;
 }

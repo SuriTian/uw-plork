@@ -47,4 +47,44 @@ export function createSqliteSchema(raw) {
       UNIQUE (post_id, applicant_id)
     );
   `);
+
+  seedDemoData(raw);
+}
+
+// Seeds a couple of users and listings so the read-only demo (see the
+// "VIEW DEMO" button on the landing page) always has something to browse,
+// even right after a fresh container restart wipes the in-memory DB.
+function seedDemoData(raw) {
+  const placeholderHash = "$2b$10$ZZQWCMUY/rOdgQxPbu06jOb6F7VsPQnwes98QoU5SRijSiRqNLgku";
+
+  const insertUser = raw.prepare(`
+    INSERT INTO users (name, email, password, discipline, year, skills, interests, terms, commitment, github)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  const alice = insertUser.run(
+    "Alice Chen", "alice.demo@uwaterloo.ca", placeholderHash, "SE", "3A",
+    JSON.stringify(["React", "Node.js", "Figma"]), JSON.stringify(["Volleyball"]),
+    JSON.stringify(["W26", "S26"]), "SERIOUS", "",
+  );
+  const ben = insertUser.run(
+    "Ben Okafor", "ben.demo@uwaterloo.ca", placeholderHash, "ECE", "2B",
+    JSON.stringify(["Embedded C", "PCB Design"]), JSON.stringify(["Chess", "Hiking"]),
+    JSON.stringify(["W26", "F26"]), "CASUAL", "",
+  );
+
+  const insertPost = raw.prepare(`
+    INSERT INTO posts (poster_id, title, description, mode, skills_needed, roles, category, stage, terms, commitment, spots)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  insertPost.run(
+    alice.lastInsertRowid, "SOLAR ROVER", "Building a solar-powered rover for the next Waterloo robotics competition.",
+    "WORK", JSON.stringify(["Embedded C", "PCB Design"]),
+    JSON.stringify([{ title: "Firmware Engineer", skills: ["Embedded C"], filled: false }]),
+    "HARDWARE", "PROTOTYPE", JSON.stringify({ founder: ["W26", "S26"], overlap: ["W26"] }), "SERIOUS", 1,
+  );
+  insertPost.run(
+    ben.lastInsertRowid, "INTRAMURAL VOLLEYBALL", "Looking for a few more players for Thursday night intramurals.",
+    "PLAY", JSON.stringify([]), JSON.stringify([]),
+    "SPORT", "RECREATIONAL", JSON.stringify({ founder: ["W26"], overlap: ["W26"] }), "CASUAL", 3,
+  );
 }

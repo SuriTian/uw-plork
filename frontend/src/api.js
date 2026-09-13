@@ -172,8 +172,8 @@ export const api = {
           name: parsed.title,
           tagline: parsed.description || "",
           category: parsed.category || "SOFTWARE",
-          stage: parsed.stage || "IDEA",
-          type: parsed.stage || "",
+          stage: parsed.mode === "PLAY" ? "" : parsed.stage || "IDEA",
+          type: parsed.mode === "PLAY" ? parsed.stage || "" : "",
           tags: parsed.category ? [parsed.category] : [],
           match:
             parsed.compatibility_score !== null &&
@@ -242,8 +242,8 @@ export const api = {
         name: created.title,
         tagline: created.description || "",
         category: created.category || data.category || "SOFTWARE",
-        stage: created.stage || stage || "IDEA",
-        type: created.stage || stage || "",
+        stage: created.mode === "PLAY" ? "" : created.stage || stage || "IDEA",
+        type: created.mode === "PLAY" ? created.stage || stage || "" : "",
         tags: created.category ? [created.category] : [],
         match: 100,
         commitment: created.commitment || data.commitment || "SERIOUS",
