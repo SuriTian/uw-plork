@@ -38,6 +38,13 @@ const parseJsonFields = (obj) => {
       parsed.skills_needed = [];
     }
   }
+  if (parsed.roles && typeof parsed.roles === "string") {
+    try {
+      parsed.roles = JSON.parse(parsed.roles);
+    } catch {
+      parsed.roles = [];
+    }
+  }
   return parsed;
 };
 
@@ -130,6 +137,7 @@ app.post("/users", async (req, res) => {
       year,
       skills,
       interests,
+      terms,
       commitment,
       github,
     } = req.body;
@@ -148,16 +156,17 @@ app.post("/users", async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     await db.execute(
-      `INSERT INTO users (name, email, password, discipline, year, skills, interests, commitment, github)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (name, email, password, discipline, year, skills, interests, terms, commitment, github)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         name,
         email,
         hashedPassword,
         discipline,
         year,
-        JSON.stringify(skills),
-        JSON.stringify(interests),
+        JSON.stringify(skills || []),
+        JSON.stringify(interests || []),
+        JSON.stringify(terms || []),
         commitment,
         github,
       ],
@@ -173,8 +182,13 @@ app.post("/users", async (req, res) => {
 });
 
 app.get("/users", async (req, res) => {
-  const [users] = await db.execute("SELECT * FROM users");
-  res.json(users);
+  try {
+    const [users] = await db.execute("SELECT * FROM users");
+    res.json(users.map(({ password, ...user }) => user));
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ error: "Failed to fetch users" });
+  }
 });
 
 app.get("/users/:id", async (req, res) => {
@@ -264,7 +278,12 @@ app.post("/posts", async (req, res) => {
       poster_id,
       title,
       description,
+      mode,
       skills_needed,
+      roles,
+      category,
+      stage,
+      terms,
       commitment,
       spots,
       deadline,
@@ -276,14 +295,25 @@ app.post("/posts", async (req, res) => {
         .json({ error: "poster_id and title are required" });
     }
 
+    // skills_needed powers the Jaccard compatibility scoring endpoints, so
+    // derive it from the structured roles when roles are provided.
+    const derivedSkills =
+      skills_needed ||
+      (roles ? roles.map((r) => r.skills || []).flat() : []);
+
     const [result] = await db.execute(
-      `INSERT INTO posts (poster_id, title, description, skills_needed, commitment, spots, deadline)
-      VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO posts (poster_id, title, description, mode, skills_needed, roles, category, stage, terms, commitment, spots, deadline)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         poster_id,
         title,
         description || "",
-        JSON.stringify(skills_needed || []),
+        mode === "PLAY" ? "PLAY" : "WORK",
+        JSON.stringify(derivedSkills),
+        JSON.stringify(roles || []),
+        category || null,
+        stage || null,
+        JSON.stringify(terms || []),
         commitment || null,
         spots || 1,
         deadline || null,
@@ -334,12 +364,14 @@ app.get("/posts", async (req, res) => {
       }
     }
 
-    const [posts] = await db.execute(`
-      SELECT p.*, u.name as poster_name, u.discipline, u.year
+    const [posts] = await db.execute(
+      `SELECT p.*, u.name as poster_name, u.discipline, u.year
       FROM posts p
       JOIN users u ON p.poster_id = u.id
-      ORDER BY p.created_at DESC
-    `);
+      WHERE p.mode = ?
+      ORDER BY p.created_at DESC`,
+      [mode],
+    );
 
     const postsWithOwnership = posts.map((post) => {
       const parsed = parseJsonFields(post);
@@ -443,12 +475,27 @@ app.get("/posts/:id", async (req, res) => {
 });
 
 app.post("/applications", async (req, res) => {
-  const { post_id, applicant_id } = req.body;
-  await db.execute(
-    `INSERT INTO applications (post_id, applicant_id) VALUES (?, ?)`,
-    [post_id, applicant_id],
-  );
-  res.json({ message: "Request sent!" });
+  try {
+    const { post_id, applicant_id } = req.body;
+
+    if (!post_id || !applicant_id) {
+      return res
+        .status(400)
+        .json({ error: "post_id and applicant_id are required" });
+    }
+
+    await db.execute(
+      `INSERT INTO applications (post_id, applicant_id) VALUES (?, ?)`,
+      [post_id, applicant_id],
+    );
+    res.json({ message: "Request sent!" });
+  } catch (error) {
+    if (error.code === "ER_DUP_ENTRY") {
+      return res.status(409).json({ error: "You already applied to this post" });
+    }
+    console.error("Error creating application:", error);
+    res.status(500).json({ error: "Failed to submit application" });
+  }
 });
 
 app.get("/applications/:post_id", async (req, res) => {
@@ -549,16 +596,21 @@ app.get("/applications/:post_id/ranked", async (req, res) => {
 });
 
 app.get("/applications/user/:user_id", async (req, res) => {
-  const [applications] = await db.execute(
-    `
-    SELECT r.*, p.title as post_title, p.description as post_description
-    FROM applications r
-    JOIN posts p ON r.post_id = p.id
-    WHERE r.applicant_id = ?
-  `,
-    [req.params.user_id],
-  );
-  res.json(applications);
+  try {
+    const [applications] = await db.execute(
+      `
+      SELECT r.*, p.title as post_title, p.description as post_description
+      FROM applications r
+      JOIN posts p ON r.post_id = p.id
+      WHERE r.applicant_id = ?
+    `,
+      [req.params.user_id],
+    );
+    res.json(applications);
+  } catch (error) {
+    console.error("Error fetching user applications:", error);
+    res.status(500).json({ error: "Failed to fetch applications" });
+  }
 });
 
 // Get top matching users for a post (users who haven't applied yet)
@@ -624,12 +676,17 @@ app.get("/posts/:post_id/top-matches", async (req, res) => {
 });
 
 app.patch("/applications/:id", async (req, res) => {
-  const { status } = req.body;
-  await db.execute("UPDATE applications SET status = ? WHERE id = ?", [
-    status,
-    req.params.id,
-  ]);
-  res.json({ message: `Request ${status}!` });
+  try {
+    const { status } = req.body;
+    await db.execute("UPDATE applications SET status = ? WHERE id = ?", [
+      status,
+      req.params.id,
+    ]);
+    res.json({ message: `Request ${status}!` });
+  } catch (error) {
+    console.error("Error updating application:", error);
+    res.status(500).json({ error: "Failed to update application" });
+  }
 });
 
 app.get("/feed/:user_id", async (req, res) => {
@@ -679,4 +736,5 @@ app.get("/feed/:user_id", async (req, res) => {
   }
 });
 
-app.listen(3000, () => console.log("Server running on http://localhost:3000"));
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
