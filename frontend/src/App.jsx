@@ -355,7 +355,7 @@ function PostModal({ mode, onClose, onSubmit, userId }) {
     if (!userId) { alert("Please log in first"); return; }
     setLoading(true);
     try {
-      const created = await api.createProject({ name: form.name.toUpperCase(), tagline: form.tagline, category: form.category, stage: isWork ? form.stage : undefined, type: !isWork ? form.type : undefined, commitment: isWork ? form.commitment : undefined, roles: isWork ? form.roles.map(r => ({ ...r, filled: false })) : undefined, spots: !isWork ? form.spots : undefined, tags: !isWork ? [form.category] : undefined, terms: { founder: form.terms, overlap: form.terms } }, userId);
+      const created = await api.createProject({ mode, name: form.name.toUpperCase(), tagline: form.tagline, category: form.category, stage: isWork ? form.stage : undefined, type: !isWork ? form.type : undefined, commitment: isWork ? form.commitment : undefined, roles: isWork ? form.roles.map(r => ({ ...r, filled: false })) : undefined, spots: !isWork ? form.spots : undefined, tags: !isWork ? [form.category] : undefined, terms: { founder: form.terms, overlap: form.terms } }, userId);
       onSubmit(created);
       onClose();
     } catch (err) {
@@ -828,7 +828,7 @@ function TopMatchesPage({ postId, postName, mode, onBack, userId }) {
   );
 }
 
-function MainApp({ userId: propUserId, initialProfile }) {
+function MainApp({ userId: propUserId, initialProfile, onLogout }) {
   const [mode, setMode] = useState("WORK");
   const [projects, setProjects] = useState([]);
   const [activities, setActivities] = useState([]);
@@ -969,7 +969,7 @@ function MainApp({ userId: propUserId, initialProfile }) {
           <div style={{ width: 5, height: 5, background: C.lime, animation: "blink 1.4s infinite" }} />
         </div>
         {["WORK", "PLAY"].map(m => (
-          <button key={m} onClick={() => switchMode(m)} style={{ padding: "0 22px", display: "flex", alignItems: "center", cursor: "pointer", fontSize: 11, letterSpacing: "0.1em", borderBottom: mode === m ? `2px solid ${C.lime}` : "2px solid transparent", color: mode === m ? C.ink : C.muted, background: "transparent", border: "none", borderBottom: mode === m ? `2px solid ${C.lime}` : "2px solid transparent", transition: "color 0.12s", userSelect: "none", paddingLeft: 22, paddingRight: 22 }}>{m} MODE</button>
+          <button key={m} onClick={() => switchMode(m)} style={{ padding: "0 22px", display: "flex", alignItems: "center", cursor: "pointer", fontSize: 11, letterSpacing: "0.1em", color: mode === m ? C.ink : C.muted, background: "transparent", border: "none", borderBottom: mode === m ? `2px solid ${C.lime}` : "2px solid transparent", transition: "color 0.12s", userSelect: "none", paddingLeft: 22, paddingRight: 22 }}>{m} MODE</button>
         ))}
         <div className="topbar-meta" style={{ marginLeft: "auto", display: "flex", borderLeft: `1px solid ${C.rule}` }}>
           {[["STREAM", (profile.discipline || "") + " " + (profile.year || "")], ["TERM", profile.terms?.[0] || ""]].filter(([_, v]) => v).map(([l, v]) => (
@@ -981,6 +981,9 @@ function MainApp({ userId: propUserId, initialProfile }) {
           <button onClick={() => setShowProfile(true)} style={{ padding: "0 18px", display: "flex", alignItems: "center", gap: 10, background: "transparent", border: "none", cursor: "pointer", borderLeft: `1px solid ${C.rule}` }}>
             <div style={{ width: 32, height: 32, border: `1px solid ${C.rule}`, background: C.surface, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>🧑‍💻</div>
             <M style={{ fontSize: 11, color: C.body }}>{profile.name ? profile.name.split(" ")[0] : "Profile"}</M>
+          </button>
+          <button onClick={onLogout} style={{ padding: "0 18px", display: "flex", alignItems: "center", background: "transparent", border: "none", cursor: "pointer", borderLeft: `1px solid ${C.rule}` }}>
+            <M style={{ fontSize: 11, color: C.muted }}>LOG OUT</M>
           </button>
         </div>
       </div>
@@ -1063,7 +1066,7 @@ function MainApp({ userId: propUserId, initialProfile }) {
               </div>
               <div style={{ display: "flex" }}>
                 {(mode === "WORK" ? ["ROLES", "TIMELINE", "INFO"] : ["SPOTS", "TIMELINE", "INFO"]).map(t => (
-                  <button key={t} onClick={() => setTab(t)} style={{ padding: "11px 20px", fontSize: 11, letterSpacing: "0.1em", cursor: "pointer", borderBottom: tab === t ? `2px solid ${C.lime}` : "2px solid transparent", color: tab === t ? C.ink : C.muted, background: "transparent", border: "none", borderBottom: tab === t ? `2px solid ${C.lime}` : "2px solid transparent", transition: "color 0.1s", userSelect: "none" }}>{t}</button>
+                  <button key={t} onClick={() => setTab(t)} style={{ padding: "11px 20px", fontSize: 11, letterSpacing: "0.1em", cursor: "pointer", color: tab === t ? C.ink : C.muted, background: "transparent", border: "none", borderBottom: tab === t ? `2px solid ${C.lime}` : "2px solid transparent", transition: "color 0.1s", userSelect: "none" }}>{t}</button>
                 ))}
               </div>
             </div>
@@ -1176,13 +1179,44 @@ function MainApp({ userId: propUserId, initialProfile }) {
   );
 }
 
+const getStoredUserId = () => {
+  try {
+    return localStorage.getItem("plork_user_id");
+  } catch {
+    return null;
+  }
+};
+
 export default function App() {
-  const [screen, setScreen] = useState("landing");
-  const [userId, setUserId] = useState(null);
+  const storedUserId = getStoredUserId();
+  const [screen, setScreen] = useState(storedUserId ? "app" : "landing");
+  const [userId, setUserId] = useState(storedUserId ? Number(storedUserId) : null);
   const [userProfile, setUserProfile] = useState(null);
 
-  if (screen === "login") return <Login onBack={() => setScreen("landing")} onSuccess={(id, user) => { setUserId(id); setUserProfile(user); setScreen("app"); }} />;
-  if (screen === "onboarding") return <Onboarding onComplete={(id, user) => { setUserId(id); setUserProfile(user); setScreen("app"); }} />;
-  if (screen === "app") return <MainApp userId={userId} initialProfile={userProfile} />;
+  const handleAuthSuccess = (id, user) => {
+    try {
+      localStorage.setItem("plork_user_id", id);
+    } catch {
+      // localStorage unavailable (e.g. private browsing) — session just won't persist
+    }
+    setUserId(id);
+    setUserProfile(user);
+    setScreen("app");
+  };
+
+  const handleLogout = () => {
+    try {
+      localStorage.removeItem("plork_user_id");
+    } catch {
+      // ignore
+    }
+    setUserId(null);
+    setUserProfile(null);
+    setScreen("landing");
+  };
+
+  if (screen === "login") return <Login onBack={() => setScreen("landing")} onSuccess={handleAuthSuccess} />;
+  if (screen === "onboarding") return <Onboarding onComplete={handleAuthSuccess} />;
+  if (screen === "app") return <MainApp userId={userId} initialProfile={userProfile} onLogout={handleLogout} />;
   return <Landing onLogin={() => setScreen("login")} onSignup={() => setScreen("onboarding")} />;
 }

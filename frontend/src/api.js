@@ -1,4 +1,4 @@
-const API_BASE = "http://localhost:3000";
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:3000";
 
 const parseJsonFields = (obj) => {
   if (!obj) return obj;
@@ -72,6 +72,7 @@ export const api = {
           year: formData.year,
           skills: formData.skills || [],
           interests: formData.interests || [],
+          terms: formData.terms || [],
           commitment: formData.commitment,
           github: formData.github || "",
         }),
@@ -152,22 +153,29 @@ export const api = {
       const posts = await response.json();
       return posts.map((post) => {
         const parsed = parseJsonFields(post);
+        // Older posts created before roles were stored as structured JSON
+        // only have a flat skills_needed array — fall back to reconstructing
+        // generic role titles for those, but prefer the real stored roles.
         const skillsNeeded = parsed.skills_needed || [];
         const roles =
-          skillsNeeded.length > 0
-            ? skillsNeeded.map((skill, idx) => ({
-                title: `Role ${idx + 1}`,
-                skills: Array.isArray(skill) ? skill : [skill],
-                filled: false,
-              }))
-            : [];
+          parsed.roles && parsed.roles.length > 0
+            ? parsed.roles
+            : skillsNeeded.length > 0
+              ? skillsNeeded.map((skill, idx) => ({
+                  title: `Role ${idx + 1}`,
+                  skills: Array.isArray(skill) ? skill : [skill],
+                  filled: false,
+                }))
+              : [];
 
         return {
           id: parsed.id,
           name: parsed.title,
           tagline: parsed.description || "",
-          category: "SOFTWARE",
-          stage: "IDEA",
+          category: parsed.category || "SOFTWARE",
+          stage: parsed.stage || "IDEA",
+          type: parsed.stage || "",
+          tags: parsed.category ? [parsed.category] : [],
           match:
             parsed.compatibility_score !== null &&
             parsed.compatibility_score !== undefined
@@ -178,7 +186,9 @@ export const api = {
           commitment: parsed.commitment || "SERIOUS",
           roles: roles,
           spots: parsed.spots || 1,
-          terms: { founder: [], overlap: [] },
+          terms: parsed.terms && !Array.isArray(parsed.terms)
+            ? parsed.terms
+            : { founder: [], overlap: [] },
           yours: parsed.yours || false,
           poster_name: parsed.poster_name,
           discipline: parsed.discipline,
@@ -195,9 +205,8 @@ export const api = {
     try {
       if (!userId) throw new Error("User ID required");
 
-      const skillsNeeded = data.roles
-        ? data.roles.map((r) => r.skills || []).flat()
-        : [];
+      const roles = data.roles || [];
+      const stage = data.stage || data.type || "";
 
       const response = await fetch(`${API_BASE}/posts`, {
         method: "POST",
@@ -206,7 +215,11 @@ export const api = {
           poster_id: userId,
           title: data.name,
           description: data.tagline || "",
-          skills_needed: skillsNeeded,
+          mode: data.mode === "PLAY" ? "PLAY" : "WORK",
+          roles,
+          category: data.category || "",
+          stage,
+          terms: data.terms || { founder: [], overlap: [] },
           commitment: data.commitment || null,
           spots: data.spots || 1,
           deadline: null,
@@ -229,21 +242,15 @@ export const api = {
         id: created.id,
         name: created.title,
         tagline: created.description || "",
-        category: data.category || "SOFTWARE",
-        stage: data.stage || "IDEA",
-        match: Math.floor(Math.random() * 20) + 70,
+        category: created.category || data.category || "SOFTWARE",
+        stage: created.stage || stage || "IDEA",
+        type: created.stage || stage || "",
+        tags: created.category ? [created.category] : [],
+        match: 100,
         commitment: created.commitment || data.commitment || "SERIOUS",
-        roles:
-          data.roles ||
-          (created.skills_needed && created.skills_needed.length > 0
-            ? created.skills_needed.map((skill, idx) => ({
-                title: `Role ${idx + 1}`,
-                skills: Array.isArray(skill) ? skill : [skill],
-                filled: false,
-              }))
-            : []),
+        roles: created.roles && created.roles.length > 0 ? created.roles : roles,
         spots: created.spots || data.spots || 1,
-        terms: data.terms || { founder: [], overlap: [] },
+        terms: created.terms || data.terms || { founder: [], overlap: [] },
         yours: true,
         poster_name: created.poster_name,
         discipline: created.discipline,
