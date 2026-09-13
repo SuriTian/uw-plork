@@ -144,6 +144,7 @@ function Landing({ onLogin, onSignup, onDemo }) {
               <button onClick={onLogin} style={{ fontSize: 12, letterSpacing: "0.1em", padding: "13px 32px", border: `1px solid ${C.rule}`, background: "transparent", color: C.body, cursor: "pointer" }}>LOG IN</button>
               <button onClick={onDemo} style={{ fontSize: 12, letterSpacing: "0.1em", padding: "13px 32px", border: `1px solid ${C.rule}`, background: "transparent", color: C.muted, cursor: "pointer" }}>VIEW DEMO</button>
             </div>
+            <M style={{ fontSize: 10, color: C.muted, display: "block", marginTop: 10 }}>Demo runs on a free backend that sleeps when idle — first load may take up to a minute.</M>
           </div>
           <div style={{ display: "flex", paddingTop: 32, borderTop: `1px solid ${C.rule}`, marginTop: 56 }}>
             {[["10K+", "ENG STUDENTS"], ["4", "CO-OP ROTATIONS/YR"], ["8", "DISCIPLINES"]].map(([n, l], i) => (
